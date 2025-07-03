@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>АИС «Микрон 2»</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.2.47/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pg@8.7.3/lib/index.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body class="bg-gray-100 font-sans">
+  <div id="app" class="flex h-screen">
+    <div v-if="user" class="sidebar w-64 p-4 text-white">
+      <h1 class="text-2xl font-bold mb-6">АИС «Микрон 2»</h1>
+      <div class="mb-4">
+        {{ user.username }} ({{ user.role }})
+        <button @click="logout" class="block w-full text-left mt-2 text-blue-200 hover:text-white">Выйти</button>
+      </div>
+      <div v-for="item in menuItems" :key="item.page" class="mb-2">
+        <button @click="currentPage = item.page" :class="{ 'bg-blue-700': currentPage === item.page }" class="w-full text-left p-2 rounded hover:bg-blue-600">{{ item.name }}</button>
+      </div>
+    </div>
+
+    <div v-if="!user" class="flex-1 flex items-center justify-center">
+      <div class="w-full max-w-md p-6 bg-white rounded-lg shadow-lg">
+        <div v-if="showRegister">
+          <h2 class="text-2xl font-bold mb-4">Регистрация</h2>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Имя</label>
+            <input v-model="registerForm.firstName" class="w-full p-2 border rounded" :class="{ 'border-red-500': errors.firstName }" />
+            <p v-if="errors.firstName" class="text-red-500 text-sm">{{ errors.firstName }}</p>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Фамилия</label>
+            <input v-model="registerForm.lastName" class="w-full p-2 border rounded" :class="{ 'border-red-500': errors.lastName }" />
+            <p v-if="errors.lastName" class="text-red-500 text-sm">{{ errors.lastName }}</p>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Отчество</label>
+            <input v-model="registerForm.patronymic" class="w-full p-2 border rounded" />
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Электронная почта</label>
+            <input v-model="registerForm.email" class="w-full p-2 border rounded" :class="{ 'border-red-500': errors.email }" />
+            <p v-if="errors.email" class="text-red-500 text-sm">{{ errors.email }}</p>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Номер телефона</label>
+            <input v-model="registerForm.phone" class="w-full p-2 border rounded" :class="{ 'border-red-500': errors.phone }" />
+            <p v-if="errors.phone" class="text-red-500 text-sm">{{ errors.phone }}</p>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Номер пропуска (6 цифр)</label>
+            <input v-model="registerForm.passNumber" class="w-full p-2 border rounded" :class="{ 'border-red-500': errors.passNumber }" />
+            <p v-if="errors.passNumber" class="text-red-500 text-sm">{{ errors.passNumber }}</p>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Пароль</label>
+            <input v-model="registerForm.password" type="password" class="w-full p-2 border rounded" />
+          </div>
+          <button @click="register" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Зарегистрироваться</button>
+          <button @click="showRegister = false" class="w-full mt-2 text-blue-600 hover:underline">Войти</button>
+        </div>
+        <div v-else>
+          <h2 class="text-2xl font-bold mb-4">Вход в систему</h2>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Логин</label>
+            <input v-model="loginForm.username" class="w-full p-2 border rounded" />
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Пароль</label>
+            <input v-model="loginForm.password" type="password" class="w-full p-2 border rounded" />
+          </div>
+          <button @click="login" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Войти</button>
+          <button @click="showRegister = true" class="w-full mt-2 text-blue-600 hover:underline">Регистрация</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="user && currentPage === 'dashboard'" class="flex-1 p-6">
+      <h2 class="text-2xl font-bold mb-4">Дашборд</h2>
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="bg-white p-4 rounded shadow">
+          <h3 class="text-lg font-semibold">Активные партии</h3>
+          <p class="text-2xl">{{ dashboard.activeBatches }}</p>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+          <h3 class="text-lg font-semibold">Оборудование в работе</h3>
+          <p class="text-2xl">{{ dashboard.equipmentOnline }}</p>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+          <h3 class="text-lg font-semibold">Задачи на сегодня</h3>
+          <p class="text-2xl">{{ dashboard.tasksToday }}</p>
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-4">
+        <div class="bg-white p-4 rounded shadow">
+          <h3 class="text-lg font-semibold">Статусы партий</h3>
+          <canvas id="batchChart"></canvas>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+          <h3 class="text-lg font-semibold">Статусы оборудования</h3>
+          <canvas id="equipmentChart"></canvas>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+          <h3 class="text-lg font-semibold">Задачи по датам</h3>
+          <canvas id="planChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="user && currentPage === 'tracking'" class="flex-1 p-6">
+      <h2 class="text-2xl font-bold mb-4">Прослеживание партий пластин</h2>
+      <div class="mb-4 flex space-x-4">
+        <select v-model="batchFilter.status" class="p-2 border rounded">
+          <option value="">Все статусы</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Completed">Completed</option>
+          <option value="Failed">Failed</option>
+        </select>
+        <button @click="clearBatchFilter" class="bg-gray-300 p-2 rounded hover:bg-gray-400">Очистить</button>
+        <button @click="showAddBatchModal = true" class="bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Добавить партию</button>
+      </div>
+      <table class="w-full bg-white rounded shadow">
+        <thead>
+          <tr class="bg-gray-200">
+            <th class="p-2">ID партии</th>
+            <th class="p-2">Статус</th>
+            <th class="p-2">Последняя операция</th>
+            <th class="p-2">Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="batch in filteredBatches" :key="batch.id" class="table-row">
+            <td class="p-2">{{ batch.id }}</td>
+            <td class="p-2">{{ batch.status }}</td>
+            <td class="p-2">{{ batch.lastOperation }}</td>
+            <td class="p-2">
+              <button @click="viewBatch(batch)" class="text-blue-600 hover:underline">Подробно</button>
+              <button @click="showConfirmDelete('batch', batch.id)" class="text-red-600 hover:underline ml-2">Удалить</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div v-if="showAddBatchModal" class="modal fixed inset-0 flex items-center justify-center">
+        <div class="bg-white p-6 rounded shadow-lg w-full max-w-md">
+          <h3 class="text-lg font-semibold mb-4">Добавить партию</h3>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">ID партии</label>
+            <input v-model="newBatch.id" class="w-full p-2 border rounded" />
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-mediumственном
+            text-gray-700">Статус</label>
+            <select v-model="newBatch.status" class="w-full p-2 border rounded">
+              <option value="In Progress">In Progress</option>
+              <option value="Completed">Completed</option>
+              <option value="Failed">Failed</option>
+            </select>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Последняя операция</label>
+            <input v-model="newBatch.lastOperation" class="w-full p-2 border rounded" />
+          </div>
+          <div class="flex space-x-2">
+            <button @click="showAddBatchModal = false" class="w-full bg-gray-300 p-2 rounded hover:bg-gray-400">Отмена</button>
+            <button @click="addBatch" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Сохранить</button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="showBatchDetails" class="modal fixed inset-0 flex items-center justify-center">
+        <div class="bg-white p-6 rounded shadow-lg w-full max-w-md">
+          <h3 class="text-lg font-semibold mb-4">Подробности партии</h3>
+          <p><strong>ID:</strong> {{ selectedBatch.id }}</p>
+          <p><strong>Статус:</strong> {{ selectedBatch.status }}</p>
+          <p><strong>Последняя операция:</strong> {{ selectedBatch.lastOperation }}</p>
+          <button @click="showBatchDetails = false" class="w-full mt-4 bg-gray-300 p-2 rounded hover:bg-gray-400">Закрыть</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="user && currentPage === 'equipment'" class="flex-1 p-6">
+      <h2 class="text-2xl font-bold mb-4">Мониторинг оборудования</h2>
+      <div class="mb-4 flex space-x-4">
+        <select v-model="equipmentFilter.status" class="p-2 border rounded">
+          <option value="">Все статусы</option>
+          <option value="Online">Online</option>
+          <option value="Offline">Offline</option>
+        </select>
+        <button @click="clearEquipmentFilter" class="bg-gray-300 p-2 rounded hover:bg-gray-400">Очистить</button>
+        <button @click="showAddEquipmentModal = true" class="bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Добавить оборудование</button>
+      </div>
+      <table class="w-full bg-white rounded shadow">
+        <thead>
+          <tr class="bg-gray-200">
+            <th class="p-2">ID</th>
+            <th class="p-2">Название</th>
+            <th class="p-2">Статус</th>
+            <th class="p-2">Следующее обслуживание</th>
+            <th class="p-2">Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="item in filteredEquipment" :key="item.id" class="table-row">
+            <td class="p-2">{{ item.id }}</td>
+            <td class="p-2">{{ item.name }}</td>
+            <td class="p-2">{{ item.status }}</td>
+            <td class="p-2">{{ item.nextService }}</td>
+            <td class="p-2">
+              <button @click="viewEquipment(item)" class="text-blue-600 hover:underline">Подробности</button>
+              <button @click="showConfirmDelete('equipment', item.id)" class="text-red-600 hover:underline ml-2">Удалить</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div v-if="showAddEquipmentModal" class="modal fixed inset-0 flex items-center justify-center">
+        <div class="bg-white p-6 rounded shadow-lg w-full max-w-md">
+          <h3 class="text-lg font-semibold mb-4">Добавить оборудование</h3>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">ID</label>
+            <input v-model="newEquipment.id" class="w-full p-2 border rounded" />
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Название</label>
+            <input v-model="newEquipment.name" class="w-full p-2 border rounded" />
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Статус</label>
+            <select v-model="newEquipment.status" class="w-full p-2 border rounded">
+              <option value="Online">Online</option>
+              <option value="Offline">Offline</option>
+            </select>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Следующее обслуживание</label>
+            <input v-model="newEquipment.nextService" class="w-full p-2 border rounded" />
+          </div>
+          <div class="flex space-x-2">
+            <button @click="showAddEquipmentModal = false" class="w-full bg-gray-300 p-2 rounded hover:bg-gray-400">Отмена</button>
+            <button @click="addEquipment" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Сохранить</button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="showEquipmentDetails" class="modal fixed inset-0 flex items-center justify-center">
+        <div class="bg-white p-6 rounded shadow-lg w-full max-w-md">
+          <h3 class="text-lg font-semibold mb-4">Подробности оборудования</h3>
+          <p><strong>ID:</strong> {{ selectedEquipment.id }}</p>
+          <p><strong>Название:</strong> {{ selectedEquipment.name }}</p>
+          <p><strong>Статус:</strong> {{ selectedEquipment.status }}</p>
+          <p><strong>Следующее обслуживание:</strong> {{ selectedEquipment.nextService }}</p>
+          <button @click="showEquipmentDetails = false" class="w-full mt-4 bg-gray-300 p-2 rounded hover:bg-gray-400">Закрыть</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="user && currentPage === 'planning'" class="flex-1 p-6">
+      <h2 class="text-2xl font-bold mb-4">Планирование производства</h2>
+      <div class="mb-4 flex space-x-4">
+        <select v-model="planFilter.type" class="p-2 border rounded">
+          <option value="">Все типы</option>
+          <option value="Short-term">Short-term</option>
+          <option value="Long-term">Long-term</option>
+        </select>
+        <button @click="clearPlanFilter" class="bg-gray-300 p-2 rounded hover:bg-gray-400">Очистить</button>
+      </div>
+      <table class="w-full bg-white rounded shadow">
+        <thead>
+          <tr class="bg-gray-200">
+            <th class="p-2">ID задачи</th>
+            <th class="p-2">Тип</th>
+            <th class="p-2">Дата</th>
+            <th class="p-2">Описание</th>
+            <th class="p-2">Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="plan in filteredPlans" :key="plan.id" class="table-row">
+            <td class="p-2">{{ plan.id }}</td>
+            <td class="p-2">{{ plan.type }}</td>
+            <td class="p-2">{{ plan.date }}</td>
+            <td class="p-2">{{ plan.description }}</td>
+            <td class="p-2">
+              <button @click="showConfirmDelete('plan', plan.id)" class="text-red-600 hover:underline">Удалить</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div v-if="user && currentPage === 'reports'" class="flex-1 p-6">
+      <h2 class="text-2xl font-bold mb-4">Генерация отчетов</h2>
+      <div class="mb-4 flex space-x-4">
+        <select v-model="reportFilter.type" class="p-2 border rounded">
+          <option value="">Все отчеты</option>
+          <option value="Batch Report">Batch Report</option>
+          <option value="Equipment Report">Equipment Report</option>
+        </select>
+        <button @click="clearReportFilter" class="bg-gray-300 p-2 rounded hover:bg-gray-400">Очистить</button>
+        <button @click="generateReport" class="bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Сгенерировать</button>
+      </div>
+      <table class="w-full bg-white rounded shadow">
+        <thead>
+          <tr class="bg-gray-200">
+            <th class="p-2">ID отчета</th>
+            <th class="p-2">Тип</th>
+            <th class="p-2">Дата</th>
+            <th class="p-2">Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="report in filteredReports" :key="report.id" class="table-row">
+            <td class="p-2">{{ report.id }}</td>
+            <td class="p-2">{{ report.type }}</td>
+            <td class="p-2">{{ report.date }}</td>
+            <td class="p-2">
+              <button @click="viewReport(report)" class="text-blue-600 hover:underline">Просмотр</button>
+              <button @click="showConfirmDelete('report', report.id)" class="text-red-600 hover:underline ml-2">Удалить</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div v-if="showReportDetails" class="modal fixed inset-0 flex items-center justify-center">
+        <div class="bg-white p-6 rounded shadow-lg w-full max-w-md">
+          <h3 class="text-lg font-semibold mb-4">Подробности отчета</h3>
+          <p><strong>ID:</strong> {{ selectedReport.id }}</p>
+          <p><strong>Тип:</strong> {{ selectedReport.type }}</p>
+          <p><strong>Дата:</strong> {{ selectedReport.date }}</p>
+          <button @click="showReportDetails = false" class="w-full mt-4 bg-gray-300 p-2 rounded hover:bg-gray-400">Закрыть</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="user && currentPage === 'users' && user.role === 'admin'" class="flex-1 p-6">
+      <h2 class="text-2xl font-bold mb-4">Управление пользователями</h2>
+      <div class="mb-4">
+        <button @click="showAddUserModal = true" class="bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Добавить пользователя</button>
+      </div>
+      <table class="w-full bg-white rounded shadow">
+        <thead>
+          <tr class="bg-gray-200">
+            <th class="p-2">ID</th>
+            <th class="p-2">Имя пользователя</th>
+            <th class="p-2">Группа</th>
+            <th class="p-2">Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="u in users" :key="u.id" class="table-row">
+            <td class="p-2">{{ u.id }}</td>
+            <td class="p-2">{{ u.username }}</td>
+            <td class="p-2">{{ u.group }}</td>
+            <td class="p-2">
+              <button @click="editUser(u)" class="text-blue-600 hover:underline">Редактировать</button>
+              <button @click="showConfirmDelete('user', u.id)" class="text-red-600 hover:underline ml-2">Удалить</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div v-if="showAddUserModal" class="modal fixed inset-0 flex items-center justify-center">
+        <div class="bg-white p-6 rounded shadow-lg w-full max-w-md">
+          <h3 class="text-lg font-semibold mb-4">Добавить пользователя</h3>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Имя пользователя</label>
+            <input v-model="newUser.username" class="w-full p-2 border rounded" />
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Группа</label>
+            <select v-model="newUser.group" class="w-full p-2 border rounded">
+              <option value="Operator">Operator</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+          <div class="flex space-x-2">
+            <button @click="showAddUserModal = false" class="w-full bg-gray-300 p-2 rounded hover:bg-gray-400">Отмена</button>
+            <button @click="addUser" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Сохранить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showConfirmModal" class="modal fixed inset-0 flex items-center justify-center">
+      <div class="bg-white p-6 rounded shadow-lg w-full max-w-md">
+        <h3 class="text-lg font-semibold mb-4">Подтверждение удаления</h3>
+        <p class="mb-4">Вы точно хотите удалить {{ confirmDeleteType === 'batch' ? 'партию' : confirmDeleteType === 'equipment' ? 'оборудование' : confirmDeleteType === 'plan' ? 'задачу' : confirmDeleteType === 'report' ? 'отчет' : 'пользователя' }}?</p>
+        <div class="flex space-x-2">
+          <button @click="cancelDelete" class="w-full bg-gray-300 p-2 rounded hover:bg-gray-400">Отмена</button>
+          <button @click="confirmDelete" class="w-full bg-red-600 text-white p-2 rounded hover:bg-red-700">Удалить</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="./script.js"></script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+.sidebar {
+      background: linear-gradient(to bottom, #1e40af, #3b82f6);
+      transition: width 0.3s ease;
+    }
+    .sidebar button:hover {
+      transform: scale(1.05);
+    }
+    .table-row:hover {
+      background-color: #f1f5f9;
+    }
+    .modal {
+      background: rgba(0, 0, 0, 0.5);
+    }
+
+.sidebar {
+  background: linear-gradient(to bottom, #1e40af, #3b82f6);
+  transition: width 0.3s ease;
+}
+.sidebar button:hover {
+  transform: scale(1.05);
+}
+.table-row:hover {
+  background-color: #f1f5f9;
+}
+.modal {
+  background: rgba(0, 0, 0, 0.5);
+}
+input.border-red-500 {
+  border-color: #ef4444;
+}
+canvas {
+  max-height: 150px;
+}
+
+.sidebar {
+  background: linear-gradient(to bottom, #1e40af, #3b82f6);
+  transition: width 0.3s ease;
+}
+
+.sidebar button:hover {
+  transform: scale(1.05);
+}
+.table-row:hover {
+  background-color: #f1f5f9;
+}
+.modal {
+  background: rgba(0, 0, 0, 0.5);
+}
+input.border-red-500 {
+  border-color: #ef4444;
+}
+canvas {
+  max-height: 150px;
+}
